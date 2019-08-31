@@ -1,1 +1,1 @@
-# Diameter-of-Graph
+# COMP90025 Parallel and Multicore Computing
