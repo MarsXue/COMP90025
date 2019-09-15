@@ -27,12 +27,9 @@ int main(int argc, char *argv[]) {
         scanf ("%ld", &C);
         scanf ("%d", &n);
     }
-    
-    MPI_Bcast(&C, 1, MPI_LONG, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    
+
     long int v[n], w[n];        /* value, weight */
-    
+
     if (rank == 0) {
         for (i = 0; i < n; i++) {
             scanf ("%ld %ld", &v[i], &w[i]);
@@ -41,11 +38,11 @@ int main(int argc, char *argv[]) {
     }
 
     uint64_t start = GetTimeStamp ();
-    long int ks = knapSack(C, w, v, n);
-    
+    long int ks = knapSack(C, w, v, n); 
+
     if (rank == 0) {
         printf ("knapsack occupancy %ld\n", ks);
-        printf ("Time: %llu us\n", (uint64_t) (GetTimeStamp() - start));
+        printf ("Time: %ld us\n", (uint64_t) (GetTimeStamp() - start));
     }
 
     MPI_Finalize ();
@@ -55,11 +52,21 @@ int main(int argc, char *argv[]) {
 
 /* PLACE YOUR CHANGES BELOW HERE */
 
+/******************************************************************************/
+
 /*
  * Created for COMP90025 Parallel and Multicore Computing - Project 1B, 2019
  * by Hanbin Li <hanbinl1>, Wenqing Xue <wenqingx>
+ * 
+ * The project is about solving the 0-1 knapsack problem in a parallel manner,
+ * which is a classic NP-hard resource allocation problem. Our implementations
+ * use two differetn approaches: dynamic programming with OpenMP and parallel
+ * dynamic programming. By contrast, dynamic programming with OpenMP performs
+ * better than the other. The detailed analysis of two methodologies will be
+ * discussed in our report.
  */
-// #include <omp.h>
+
+#include <omp.h>
 #include <stdlib.h>
 #include <strings.h>
 
@@ -67,75 +74,126 @@ long int max(long int x, long int y) {
     return (x > y) ? x : y;
 }
 
-/* (No longer from the URL given in line 2) */
-long int knapSack(long int C, long int w[], long int v[], int n) {
+// MPI parallel dynamic programming approach
+// For each node, they will compute [rank % size] th rows
+long int parallel_dp(long int C, long int w[], long int v[], int n) {
     // broadcast the arrays of values and weights first
     MPI_Bcast(v, n, MPI_LONG, 0, MPI_COMM_WORLD);
     MPI_Bcast(w, n, MPI_LONG, 0, MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
 
+    // variables for MPI send and receive opertaion
     MPI_Status status;
     MPI_Request request;
 
-    int i, j, k;
-    // long int cost[n][C+1];
-    long int cost_i = 0;
+    int i;
+    long int j, k;
+    long int cost = 0;
     long int max_value = 0;
 
-    long int *cost[n]; 
+    // 2D array memeory allocation
+    long int *K[n]; 
     for (i=0; i<n; i++) {
-        cost[i] = (long int *)malloc((C+1) * sizeof(long int)); 
+        K[i] = (long int *)malloc((C+1) * sizeof(long int)); 
     }
 
+    // MPI rank, size
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     
-    // for each item
-    for(i=0; i<n; i++){
-        printf("rank %d i = %d\n", rank, i);
-        // each rank computes its columns
-        // #pragma omp parallel for schedule(dynamic)
-        for(j=rank; j<=C; j+=size){
-            
-            // find the best value with the new item
-            if (j - w[i] < 0) {
-                cost_i = 0;
-            } else if (i == 0 && j-w[i] >= 0) {
-                cost_i = v[i];
+    // for each item from 0 to n-1
+    for (i=0; i<n; i++) {
+        // for each possible capacity from 0 to C
+        // each rank computes its own rows
+        for (j=rank; j<=C; j+=size) {
+            // find the best cost value for this item
+            if (j < w[i]) {
+                cost = 0;
+            } else if (i == 0 && j >= w[i]) {
+                cost = v[i];
             } else {
-                MPI_Recv(&cost_i, 1, MPI_INT, (j-w[i]) % size, i-1, MPI_COMM_WORLD, &status);
-                cost_i += v[i];
+                MPI_Recv(&cost, 1, MPI_LONG, (j-w[i])%size, i-1, MPI_COMM_WORLD, &status);
+                cost += v[i];
             }
-
-            // find the maximum of current cost
+            // assign the maximum cost value in current situation
+            // which is the same as in sequential dynamic programming
             if (i == 0) {
-                cost[i][j] = max(cost_i, i);
+                K[i][j] = max(cost, 0);
             } else {
-                cost[i][j] = max(cost_i, cost[i-1][j]);
+                K[i][j] = max(cost, K[i-1][j]);
             }
-
-            // Send to all procs that could need the new value (non blancking)
-            for (k=j+1; k<=C; k++) {
-                if (k-j == w[i+1]) {
-                    MPI_Isend(&cost[i][j], 1, MPI_INT, k % size, i, MPI_COMM_WORLD, &request);
-                }
+            // MPI_Isend is an asynchronization operation
+            // send to all nodes that may need this updated value
+            if (w[i+1]+j <= C) {
+                MPI_Isend(&K[i][j], 1, MPI_INT, (w[i+1]+j) % size, i, MPI_COMM_WORLD, &request);
             }
         }
     }
 
+    // make sure all nodes are completed at this point
     MPI_Barrier(MPI_COMM_WORLD);
 
+    // only the node computes the last row will handle the final result
+    // which is the right bottom corner of the 2D array
     if (rank == C % size) {
-        max_value = cost[n-1][C];
+        max_value = K[n-1][C];
     }
 
-    // free the malloc array
+    // free the memory allocation
     for (i=0; i<n; i++) {
-        free(cost[i]); 
+        free(K[i]); 
     }
 
     return max_value;
 }
 
-/*mpicc -O3 wenqingx-knapsack.c -o wenqingx-knapsack*/
+/* (No longer from the URL given in line 2) */
+long int knapSack(long int C, long int w[], long int v[], int n) {
+    // MPI rank
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    int i;
+    long int j;
+
+    // 2D array memeory allocation
+    long int *K[n+1]; 
+    for (i=0; i<=n; i++) {
+        K[i] = (long int *)malloc((C+1) * sizeof(long int)); 
+    }
+
+    // iterate each item
+    for (i=0; i<=n; i++) {
+        // no dependency in this for loop
+        // so use OpenMP for optimisation
+        #pragma omp parallel for
+        for (j = 0; j <= C; j++) {
+            if (i == 0 || j == 0) {
+                K[i][j] = 0;
+            } else if (w[i-1] <= j) {
+                K[i][j] = max(v[i-1] + K[i-1][j-w[i-1]], K[i-1][j]);
+            } else {
+                K[i][j] = K[i-1][j];
+            }
+        }
+    }
+
+    // make sure all nodes are completed at this point
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    int max_value = 0;
+    // only root node extracts the final result
+    if (rank == 0) {
+        max_value = K[n][C];
+    }
+
+    // free the memory allocation
+    for (i=0; i<=n; i++) {
+        free(K[i]); 
+    }
+
+    return max_value;
+}
+
+/* mpicc -O3 -std=c99 -fopenmp wenqingx-knapsack.c -o wenqingx-knapsack */
