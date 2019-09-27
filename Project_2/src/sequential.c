@@ -78,13 +78,15 @@ void compute_accelerations() {
 		accelerations[i].z = 0;
 		for (int j=0; j<bodies; j++) {
 			if (i != j) {
-				accelerations[i] = add_vectors(accelerations[i], scale_vector(GravConstant*masses[j]/pow(mod(subtract_vectors(positions[i],positions[j])),3), subtract_vectors(positions[j],positions[i])));
+				accelerations[i] = add_vectors(accelerations[i],
+					scale_vector(GravConstant * masses[j] / pow(mod(subtract_vectors(positions[i], positions[j])), 3), 
+					subtract_vectors(positions[j],positions[i])));
 			}
 		}
 	}
 }
 
-void compute_velocities(){
+void compute_velocities() {
 	for (int i=0; i<bodies; i++) {
 		velocities[i] = add_vectors(velocities[i],accelerations[i]);
 	}
@@ -92,20 +94,21 @@ void compute_velocities(){
 
 void compute_positions(){
 	for (int i=0;i<bodies; i++) {
-		positions[i] = add_vectors(positions[i], add_vectors(velocities[i], scale_vector(0.5,accelerations[i])));
+		positions[i] = add_vectors(positions[i], add_vectors(velocities[i], 
+									scale_vector(0.5, accelerations[i])));
 	}
 }
 
-void simulate(){
+void simulate() {
 	compute_accelerations();
 	compute_positions();
 	compute_velocities();
 	resolve_collisions();
 }
 
-int main(int argc,char* argv[]) {
-	if (argc!=2) {
-		printf("Usage : %s <file name containing system configuration data>",argv[0]);
+int main(int argc, char* argv[]) {
+	if (argc != 2) {
+		printf("Usage : %s <file name containing system configuration data>", argv[0]);
 	} else {
 		initiate_system(argv[1]);
 		printf("Body   :     x              y               z           |           vx              vy              vz   ");
@@ -113,7 +116,9 @@ int main(int argc,char* argv[]) {
 			printf("\nCycle %d\n", i+1);
 			simulate();
 			for (int j=0; j<bodies; j++) {
-				printf("Body %d : %lf\t%f\t%lf\t|\t%lf\t%lf\t%lf\n",j+1,positions[j].x,positions[j].y,positions[j].z,velocities[j].x,velocities[j].y,velocities[j].z);
+				printf("Body %d : %lf\t%f\t%lf\t|\t%lf\t%lf\t%lf\n", j+1, 
+				positions[j].x, positions[j].y, positions[j].z,
+				velocities[j].x, velocities[j].y, velocities[j].z);
 			}
 		}
 	}
