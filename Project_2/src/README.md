@@ -14,14 +14,13 @@ The focus of this project is to simulate the two-dimensional N-body problem.
 
 ### Folder Structure
 ```js
-/
+/    
+├── N2
+│   └── N2_code.c       // C code for N^2 approach
+├── NlogN
+│   ├── NlogN_code.c    // C code for BH approach
+│   └── tree.c          // C code for BH tree
+├── README.md
 ├── figure.py           // Python code for figures
-├── generator.c         // C code for generating the test data
-├── N2/                 // Folder for N^2 approach
-├── NlogN/              // Folder for Barnes-Hut approach
-├── test_1200.txt       // Test data with 1200 particles
-├── test_2400.txt       // Test data with 2400 particles
-├── test_3600.txt       // Test data with 3600 particles
-├── test_4800.txt       // Test data with 4800 particles
-└── test_6000.txt       // Test data with 6000 particles
+└── generator.c         // C code for generating the test data
 ```

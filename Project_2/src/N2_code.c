@@ -235,4 +235,4 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-/* mpicc -O3 -std=c99 -fopenmp N2_code.c -o N2_code */
+/* mpicc -O3 -std=c99 -fopenmp N2_code.c -o N2_code -lm */

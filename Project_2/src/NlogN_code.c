@@ -212,4 +212,4 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-/* mpicc -O3 -std=c99 -fopenmp NlogN_code.c -o NlogN_code */
+/* mpicc -O3 -std=c99 -fopenmp NlogN_code.c -o NlogN_code -lm */
