@@ -5,7 +5,7 @@
  * The project is to simulate the N-Body problem in a parallel manner,
  * which is a well-known topic in physics and astronomy area.
  * 
- * This algorithm has a complexity of O(N^2).
+ * This algorithm is implemented using openMP + MPI with a complexity of O(N^2).
  */
 
 #include <stdio.h>
@@ -78,6 +78,8 @@ void read_file(char *file_name, double m[], vector p[], vector recv_v[], int N, 
     MPI_Scatter(v, chunk, MPI_VECTOR, recv_v, chunk, MPI_VECTOR, 0, MPI_COMM_WORLD);
 }
 
+
+// compute the acceleration of the particles
 void compute_force(int idx, double m[], vector p[], vector f[], int N, double G, int chunk) {
 
     vector tmp;

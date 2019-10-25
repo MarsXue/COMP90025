@@ -126,17 +126,7 @@ int main(int argc, char *argv[]) {
     }
 	return 0;
 
-    // check parameter
-    // if (argc != 1) {
-    //     if (strcmp(argv[1], "-openmp") == 0) {
-    //         printf("OpenMP approach\n");
-    //     } else if (strcmp(argv[1], "-gpu") == 0) {
-    //         printf("CUDA approach\n");
-    //     } else {
-    //         printf("parameter: -openmp | -gpu\n");
-    //         exit(EXIT_FAILURE);
-    //     }
-    // }
+   
 
     // Initialize MPI
     // MPI_Init(&argc, &argv);

@@ -4,8 +4,10 @@
  * 
  * The project is to simulate the N-Body problem in a parallel manner,
  * which is a well-known topic in physics and astronomy area.
- * 
- * This algorithm has a complexity of O(N*log(N)).
+ *
+ * This algorithm is implemented using Barnes Hut algorithm with OpenMP+MPI.
+ * This approach has a complexity of O(N*log(N)).
+ * There is an additional file "tree.c" used for BH algorithm.
  */
 
 #include <stdio.h>
@@ -54,6 +56,8 @@ void read_input(char *argv[], int *N, int *T, double *G, double *delta_t){
     MPI_Bcast(delta_t, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
+
+// read the initial conditions into bodies struct
 body_t *read_file(char *file_name, body_t *bodies, int N){
     
     FILE * file = fopen(file_name, "r");
@@ -134,6 +138,8 @@ int main(int argc, char *argv[]) {
     }
     
     int i;
+    
+    //broadcast masses, positions and forces of particles to other process
     for (i = 0; i < N; i++) {
         MPI_Bcast(&((bodies)[i].m), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         MPI_Bcast(&((bodies)[i].px), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -158,6 +164,7 @@ int main(int argc, char *argv[]) {
             ymax = max(ymax, bodies[i].py);
         }
         
+        // construct quad-tree
         node_t *rootnode = create_node(bodies, xmin, xmax, ymin, ymax);
         
         #pragma omp for schedule(static, N / size)
@@ -165,6 +172,7 @@ int main(int argc, char *argv[]) {
             insert_body(bodies + i, rootnode);
         }
         
+        // compute force
         #pragma omp for schedule(static, N / size)
         for (i = rank; i < N; i += size) {
             tree_sum(rootnode, bodies + i, G, treeratio);
@@ -176,6 +184,7 @@ int main(int argc, char *argv[]) {
             MPI_Bcast(&(bodies[i].fy), 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
         }
         
+        //update positions and velocities
         #pragma omp for schedule(static, N / size)
         for (i = 0; i < N; i++){
             bodies[i].px += delta_t * bodies[i].vx;
@@ -186,8 +195,10 @@ int main(int argc, char *argv[]) {
         }
         delete_tree(rootnode);
     }
-
+    
+    // generate output
     print_output(bodies, N);
+    
     
     if (rank == 0) {
         printf ("Time: %llu us\n", (uint64_t) (GetTimeStamp() - start));

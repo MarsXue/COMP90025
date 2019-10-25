@@ -1,7 +1,20 @@
+/*
+* Created for COMP90025 Parallel and Multicore Computing - Project 2, 2019
+* by Hanbin Li <hanbinl1>, Wenqing Xue <wenqingx>
+*
+* The project is to simulate the N-Body problem in a parallel manner,
+* which is a well-known topic in physics and astronomy area.
+*
+* This file needs to work with "NlogN_code.c" to achieve a complexity of
+* O(N*log(N)).
+*/
+
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+
+// represent a single particle in the system
 typedef struct body {
     double m;           // mass
     double px, py;      // position x, y
@@ -9,6 +22,8 @@ typedef struct body {
     double fx, fy;      // force x, y
 } body_t;
 
+
+// represent a single node of the tree
 typedef struct node {
     double totalmass;
     double centerx, centery;
@@ -22,11 +37,15 @@ typedef struct node {
     struct node *SE;
 } node_t;
 
+
 typedef enum quadrant {
     NW, NE, SW, SE
 } quadrant_t;
 
 
+
+
+// create a dial (xmin, xmax, ymin, ymax) and determine which sub-team the node belongs to
 quadrant_t get_quadrant(double x, double y, double xmin, double xmax, double ymin, double ymax) {
     
     double midx = xmin + 0.5 * (xmax - xmin);
@@ -48,6 +67,7 @@ quadrant_t get_quadrant(double x, double y, double xmin, double xmax, double ymi
 }
 
 
+// update the center mass after each insertion
 void update_center(node_t * node, body_t * body) {
     node->centerx = (node->totalmass * node->centerx + body->m * body->px) / (node->totalmass + body->m);
     node->centery = (node->totalmass * node->centery + body->m * body->py) / (node->totalmass + body->m);
@@ -55,6 +75,7 @@ void update_center(node_t * node, body_t * body) {
 }
 
 
+// create a leaf node to insert in the quad-tree
 node_t *create_node(body_t *body, double xmin, double xmax, double ymin, double ymax) {
     node_t *root = malloc(sizeof(node_t));
     
@@ -79,6 +100,7 @@ node_t *create_node(body_t *body, double xmin, double xmax, double ymin, double 
 }
 
 
+// insert a paticle in the quad-tree, transforming a leaf node in a branch
 void insert_body(body_t *body, node_t *node){
     
     quadrant_t existingquad, newquad;
@@ -86,9 +108,11 @@ void insert_body(body_t *body, node_t *node){
     double xmid = node->xmin + 0.5 * (node->xmax - node->xmin);
     double ymid = node->ymin + 0.5 * (node->ymax - node->ymin);
     
+    // first check if there is an existing quad tree
     if (node->body) {
         existingquad = get_quadrant(node->body->px, node->body->py, node->xmin, node->xmax, node->ymin, node->ymax);
         
+        // insert a particle into the tree
         switch (existingquad) {
             case NW:
                 node->NW = create_node(node->body, xmid, node->xmax, ymid, node->ymax);
@@ -107,9 +131,11 @@ void insert_body(body_t *body, node_t *node){
     }
 
     newquad = get_quadrant(body->px, body->py, node->xmin, node->xmax, node->ymin, node->ymax);
+    
+    // update the centre mass of the tree
     update_center(node, body);
     
-    //inserisco un nuovo punto in un nuovo quadrante se questo è vuoto altrimenti chiamo ricorsivamente insert_body
+    //insert a new point in a new quadrant if it is empty, otherwise call recursively insert_body
     switch (newquad){
         case NW:
             if (!node->NW) {
@@ -143,6 +169,7 @@ void insert_body(body_t *body, node_t *node){
 }
 
 
+// delete the tree after use
 void delete_tree(node_t *node){
     if (!node) {
         if (!node->NW) delete_tree(node->NW);
@@ -155,6 +182,7 @@ void delete_tree(node_t *node){
 }
 
 
+// sum the forces on body p
 void tree_sum(node_t *node, body_t *body, double G, double treeratio){
 
     double factor;
